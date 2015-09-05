@@ -2,6 +2,7 @@ import recase from 'change-case';
 import _ from 'lodash';
 
 const stylesOpts = Symbol('stylesOpts');
+const components = [];
 
 function extractKeyframes(keyframe, prefix) {
   const rulesKeyframe = Object.keys(keyframe).map((attr) => {
@@ -20,25 +21,53 @@ function extractStyle(selector, reactStyle, { prefix = '' } = {}) {
   return `${prefix}${selector} {\n${rules}\n}`;
 }
 
+function createCSSString(displayName, stylesObj, options) {
+  return `/* @react-statics-styles ${displayName} */\n${Object.keys(stylesObj)
+    .map((selector) => extractStyle(selector, stylesObj[selector], options))
+  .join('\n')}\n`;
+}
+
 function extractStyles(Component) {
   if(!_.isObject(Component) ||
       !Component.styles ||
       !_.isObject(Component.styles)) {
     return null;
   }
-  return `/* @react-statics-styles ${Component.displayName} */\n${Object.keys(Component.styles)
-    .map((selector) => extractStyle(selector, Component.styles[selector], Component[stylesOpts]))
-  .join('\n')}\n`;
+  return createCSSString(Component.displayName, Component.styles, Component[stylesOpts]);
 }
 
 function extractAllStyles(Components) {
   return _.without(_.map(Components, extractStyles), null).join('\n');
 }
 
+function injectStyles(Component, newStyles, options) {
+  let index = components.indexOf(Component);
+  if(index === -1) {
+    index = components.length;
+    components.push(Component);
+  }
+  const stylesObj = Object.assign({}, Component.styles || {}, newStyles);
+  const base64CSS = btoa(createCSSString(Component.displayName, stylesObj, options));
+  let stylesheet = document.querySelector(`link.dev-css-${index}`);
+  if(!stylesheet) {
+    stylesheet = document.createElement('LINK');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.className = `dev-css-${index}`;
+    document.head.appendChild(stylesheet);
+  }
+  stylesheet.href = `data:text/css;base64,${base64CSS}`;
+}
+
 function styles(newStyles, opts) {
-  return (Component) => Object.assign(class extends Component {
-    static styles = Object.assign({}, Component.styles || {}, newStyles);
-  }, { [stylesOpts]: opts });
+  return (Component) => {
+    if(process.browser && process.env.NODE_ENV !== 'production') {
+      injectStyles(Component, newStyles, opts);
+      return Component;
+    }
+    return Object.assign(class extends Component {
+      static styles = Object.assign({}, Component.styles || {}, newStyles);
+    }, { [stylesOpts]: opts });
+  };
 }
 
 export default { extractStyle, extractStyles, extractAllStyles, styles, stylesOpts };
