@@ -2,7 +2,6 @@ import recase from 'change-case';
 import _ from 'lodash';
 
 const stylesOpts = Symbol('stylesOpts');
-const components = [];
 
 function extractKeyframes(keyframe, prefix) {
   const rulesKeyframe = Object.keys(keyframe).map((attr) => {
@@ -41,21 +40,15 @@ function extractAllStyles(Components) {
 }
 
 function injectStyles(Component, newStyles, options) {
-  let index = components.indexOf(Component);
-  if(index === -1) {
-    index = components.length;
-    components.push(Component);
-  }
   const stylesObj = Object.assign({}, Component.styles || {}, newStyles);
-  const base64CSS = btoa(createCSSString(Component.displayName, stylesObj, options));
-  let stylesheet = document.querySelector(`link.dev-css-${index}`);
+  const cssString = createCSSString(Component.displayName, stylesObj, options);
+  let stylesheet = document.querySelector(`style.dev-css-${Component.displayName}`);
   if(!stylesheet) {
-    stylesheet = document.createElement('LINK');
-    stylesheet.rel = 'stylesheet';
-    stylesheet.className = `dev-css-${index}`;
+    stylesheet = document.createElement('STYLE');
+    stylesheet.className = `dev-css-${Component.displayName}`;
     document.head.appendChild(stylesheet);
   }
-  stylesheet.href = `data:text/css;base64,${base64CSS}`;
+  stylesheet.innerHTML = cssString;
 }
 
 function styles(newStyles, opts) {
